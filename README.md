@@ -32,10 +32,16 @@ Statuses: `Found` → `Ready to review` → `Applied` · `Skipped` · `Closed`
 
 ## Quick start
 
+You need Python 3.10+ (check with `python3 --version`; if it's missing, install it from [python.org/downloads](https://www.python.org/downloads/)).
+
 ```bash
 git clone https://github.com/ananyajoshi0203-cpu/ai-job-search-assistant.git
 cd ai-job-search-assistant
-pip install -e .
+
+python3 -m venv .venv
+source .venv/bin/activate               # Windows: .venv\Scripts\activate
+python -m pip install -e .
+
 cp config.example.yaml config.yaml     # edit: your profile, roles, locations, ATS boards
 export OPENAI_API_KEY=...               # your own key, any OpenAI-compatible endpoint
 
@@ -44,6 +50,13 @@ jobhunt crawl                           # one full run
 jobhunt review                          # local review page at http://localhost:8765
 jobhunt export --out tracker.xlsx       # spreadsheet export
 ```
+
+Notes that save everyone time:
+
+- The command is **`jobhunt`** — one word, no space.
+- **Every new terminal window** needs `source .venv/bin/activate` again (your prompt shows `(.venv)` when it's active). Skip it and you'll get `command not found: jobhunt`.
+- Never call bare `pip` — on macOS it often doesn't exist. Always `python -m pip` inside the venv (or `python3 -m pip` outside it). The venv also avoids macOS's `externally-managed-environment` error.
+- No entry point? Run the module directly from the repo folder: `PYTHONPATH=src python3 -m jobhunt.cli crawl`.
 
 Try it safely with the fictional sample profile first (no API key needed if tailoring is off):
 
