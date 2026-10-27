@@ -1,48 +1,102 @@
 """Local review page — the open-source version of the chat review list.
 
-Shows every 'Ready to review' role: role name linked to the full job
-description, a link to the exact tailored resume for that role, and
-[Apply] / [No] buttons under each pair.
+Shows every 'Ready to review' role as a card: role name linked to the full
+job description, a link to the exact tailored resume for that role, live
+counters, and [Apply] / [No] buttons under each pair.
 
 - No  -> Status becomes Skipped (never shown again).
-- Apply -> records 'Pre-fill requested' in Notes and prints the prefill
-  command for you to run. It NEVER submits an application.
+- Apply -> records 'Pre-fill requested' in Notes. It NEVER submits an
+  application; it tells you the prefill command to run yourself.
 """
 from __future__ import annotations
 import html
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urlparse, quote
 from .db import Tracker
 
+CSS = """
+* { box-sizing: border-box; }
+body { font-family: system-ui, -apple-system, sans-serif; margin: 0;
+       background: #f6f7f9; color: #1a1d21; }
+.wrap { max-width: 760px; margin: 0 auto; padding: 24px 16px 48px; }
+header h1 { font-size: 22px; margin: 0 0 4px; }
+header p { color: #5b6470; margin: 0 0 16px; font-size: 14px; }
+.counters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.chip { background: #fff; border: 1px solid #dfe3e8; border-radius: 999px;
+        padding: 6px 12px; font-size: 13px; }
+.chip b { font-size: 15px; }
+.chip.ready { border-color: #2f7d4f; color: #2f7d4f; }
+.toast { background: #e8f5ec; border: 1px solid #2f7d4f; color: #205c39;
+         border-radius: 10px; padding: 10px 14px; margin-bottom: 16px;
+         font-size: 14px; }
+.card { background: #fff; border: 1px solid #dfe3e8; border-radius: 12px;
+        padding: 16px; margin: 12px 0; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+.card h3 { margin: 0 0 6px; font-size: 17px; }
+.card h3 a { color: #0b5cad; text-decoration: none; }
+.card h3 a:hover { text-decoration: underline; }
+.meta { color: #5b6470; font-size: 13px; margin: 0 0 10px; }
+.meta a { color: #0b5cad; }
+.pill { display: inline-block; background: #fff4d6; color: #7a5b00;
+        border: 1px solid #e5cf8a; border-radius: 999px; padding: 1px 8px;
+        font-size: 12px; margin-left: 6px; }
+.actions { display: flex; gap: 8px; margin-top: 10px; }
+button { font-size: 14px; border-radius: 8px; padding: 8px 16px; cursor: pointer;
+         border: 1px solid transparent; }
+button.apply { background: #2f7d4f; color: #fff; }
+button.no { background: #fff; border-color: #c3cBD2; color: #444; }
+.notes { color: #5b6470; font-size: 13px; margin: 10px 0 0; white-space: pre-wrap; }
+.empty { background: #fff; border: 1px dashed #c3cbd2; border-radius: 12px;
+         padding: 24px; text-align: center; color: #5b6470; }
+@media (prefers-color-scheme: dark) {
+  body { background: #14171a; color: #e8eaed; }
+  .card, .chip, .empty, button.no { background: #1d2126; border-color: #333a42; }
+  .meta, .notes, header p, .empty { color: #9aa4ae; }
+  .card h3 a, .meta a { color: #6cb2f5; }
+}
+"""
 
-def render(tracker: Tracker) -> str:
+
+def render(tracker: Tracker, msg: str = "") -> str:
+    all_jobs = tracker.list()
+    counts = {s: sum(1 for j in all_jobs if j.status == s)
+              for s in ("Ready to review", "Applied", "Skipped", "Found", "Closed")}
+    ready = [j for j in all_jobs if j.status == "Ready to review"]
+    chips = (f'<span class="chip ready">Ready to review <b>{counts["Ready to review"]}</b></span>'
+             f'<span class="chip">Applied <b>{counts["Applied"]}</b></span>'
+             f'<span class="chip">Skipped <b>{counts["Skipped"]}</b></span>'
+             f'<span class="chip">Found <b>{counts["Found"]}</b></span>'
+             f'<span class="chip">Closed <b>{counts["Closed"]}</b></span>')
+    toast = f'<div class="toast">{html.escape(msg)}</div>' if msg else ""
     cards = []
-    for j in tracker.list(status="Ready to review"):
+    for j in ready:
         cards.append(f"""
         <div class="card">
-          <h3>{html.escape(j.company)} — <a href="{html.escape(j.link)}" target="_blank">{html.escape(j.role)}</a></h3>
-          <p>{html.escape(j.location)} · Found {html.escape(j.date_found)} ·
+          <h3>{html.escape(j.company)} — <a href="{html.escape(j.link)}" target="_blank" rel="noopener">{html.escape(j.role)}</a><span class="pill">Ready to review</span></h3>
+          <p class="meta">{html.escape(j.location)} · Found {html.escape(j.date_found)} ·
              Resume: <a href="file://{html.escape(j.resume_version)}">{html.escape(j.resume_version)}</a></p>
-          <form method="post" action="/decide">
+          <form method="post" action="/decide" class="actions">
             <input type="hidden" name="id" value="{j.id}">
-            <button name="decision" value="apply">[Apply]</button>
-            <button name="decision" value="no">[No]</button>
+            <button class="apply" name="decision" value="apply">Apply</button>
+            <button class="no" name="decision" value="no">No</button>
           </form>
           <p class="notes">{html.escape(j.notes)}</p>
         </div>""")
-    body = "\n".join(cards) or "<p>No applications ready for review.</p>"
+    body = "\n".join(cards) or '<div class="empty">No applications ready for review.</div>'
     return f"""<!doctype html><html><head><meta charset="utf-8">
-<title>Job Search — Review</title>
-<style>body{{font-family:system-ui;max-width:760px;margin:2rem auto}}
-.card{{border:1px solid #ccc;border-radius:8px;padding:1rem;margin:1rem 0}}
-.notes{{color:#555;font-size:.9em}}</style></head>
-<body><h2>{len(cards)} applications ready for review</h2>{body}</body></html>"""
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Job Search — Review</title><style>{CSS}</style></head>
+<body><div class="wrap">
+<header><h1>Applications ready for review</h1>
+<p>Apply pre-fills the form and stops before Submit. No marks a role Skipped — it never comes back.</p></header>
+<div class="counters">{chips}</div>{toast}{body}
+</div></body></html>"""
 
 
 def serve(tracker: Tracker, port: int = 8765):
     class H(BaseHTTPRequestHandler):
         def do_GET(self):
-            out = render(tracker).encode()
+            msg = parse_qs(urlparse(self.path).query).get("msg", [""])[0]
+            out = render(tracker, msg=msg).encode()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(out)))
@@ -54,16 +108,20 @@ def serve(tracker: Tracker, port: int = 8765):
             form = parse_qs(self.rfile.read(length).decode())
             job_id = int(form["id"][0])
             decision = form["decision"][0]
+            msg = ""
             if decision == "no":
                 tracker.set_status(job_id, "Skipped")
+                msg = "Marked Skipped — it will never be shown again."
             elif decision == "apply":
                 job = tracker.get(job_id)
                 tracker.append_note(
                     job_id,
                     "Pre-fill requested from review page. Run: jobhunt prefill "
                     f"--job-id {job_id}  (fills the form, stops before Submit).")
+                msg = (f"Apply noted for {job.company} — {job.role}. "
+                       f"Run: jobhunt prefill --job-id {job_id} (stops before Submit).")
             self.send_response(303)
-            self.send_header("Location", "/")
+            self.send_header("Location", "/?msg=" + quote(msg))
             self.end_headers()
 
         def log_message(self, *a):
