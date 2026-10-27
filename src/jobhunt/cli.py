@@ -62,7 +62,7 @@ def main(argv=None):
             print(f"[{j.id}] {j.status:16} {j.company} — {j.role} — {j.link}")
     elif args.cmd == "review":
         from .review import serve
-        serve(tracker, port=args.port)
+        serve(tracker, port=args.port, config_path=args.config)
     elif args.cmd == "export":
         tracker.export_xlsx(args.out)
         print(f"Exported to {args.out}")

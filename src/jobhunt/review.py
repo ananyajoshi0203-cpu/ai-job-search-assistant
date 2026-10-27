@@ -146,20 +146,72 @@ def render(tracker: Tracker, msg: str = "") -> str:
     return _page("Job Search — Review", inner)
 
 
-def serve(tracker: Tracker, port: int = 8765):
+def serve(tracker: Tracker, port: int = 8765, config_path: str = "config.yaml"):
+    from .crawler import load_config, run_crawl, tailor_found
+
     class H(BaseHTTPRequestHandler):
-        def do_GET(self):
-            msg = parse_qs(urlparse(self.path).query).get("msg", [""])[0]
-            out = render(tracker, msg=msg).encode()
+        def _send_html(self, html_text: str):
+            out = html_text.encode()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(out)))
             self.end_headers()
             self.wfile.write(out)
 
+        def _redirect_msg(self, msg: str):
+            self.send_response(303)
+            self.send_header("Location", "/?msg=" + quote(msg))
+            self.end_headers()
+
+        def do_GET(self):
+            parsed = urlparse(self.path)
+            qs = parse_qs(parsed.query)
+            if parsed.path == "/list":
+                self._send_html(render_list(tracker, status=qs.get("status", [None])[0]))
+            elif parsed.path == "/export":
+                fd, tmp = tempfile.mkstemp(suffix=".xlsx")
+                os.close(fd)
+                try:
+                    tracker.export_xlsx(tmp)
+                    data = open(tmp, "rb").read()
+                finally:
+                    os.unlink(tmp)
+                self.send_response(200)
+                self.send_header("Content-Type",
+                                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                self.send_header("Content-Disposition", 'attachment; filename="tracker.xlsx"')
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+            else:
+                self._send_html(render(tracker, msg=qs.get("msg", [""])[0]))
+
         def do_POST(self):
             length = int(self.headers.get("Content-Length", 0))
             form = parse_qs(self.rfile.read(length).decode())
+            if urlparse(self.path).path == "/run":
+                action = form.get("action", [""])[0]
+                try:
+                    config = load_config(config_path)
+                except Exception as e:
+                    self._redirect_msg(f"Could not load config '{config_path}': {e}")
+                    return
+                try:
+                    if action == "crawl":
+                        s = run_crawl(config, tracker)
+                        msg = (f"Crawl done: {s['found_new']} new, {s['ready']} ready, "
+                               f"{s['closed']} closed, {s['duplicates']} duplicates, "
+                               f"{len(s['errors'])} errors.")
+                    elif action == "tailor":
+                        s = tailor_found(config, tracker)
+                        msg = (f"Tailor done: {s['ready']} ready, {s['closed']} closed, "
+                               f"{len(s['errors'])} errors.")
+                    else:
+                        msg = f"Unknown action: {action}"
+                except Exception as e:
+                    msg = f"{action} failed: {e}"
+                self._redirect_msg(msg)
+                return
             job_id = int(form["id"][0])
             decision = form["decision"][0]
             msg = ""
@@ -174,9 +226,7 @@ def serve(tracker: Tracker, port: int = 8765):
                     f"--job-id {job_id}  (fills the form, stops before Submit).")
                 msg = (f"Apply noted for {job.company} — {job.role}. "
                        f"Run: jobhunt prefill --job-id {job_id} (stops before Submit).")
-            self.send_response(303)
-            self.send_header("Location", "/?msg=" + quote(msg))
-            self.end_headers()
+            self._redirect_msg(msg)
 
         def log_message(self, *a):
             pass

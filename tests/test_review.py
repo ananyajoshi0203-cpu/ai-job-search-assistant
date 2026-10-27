@@ -31,3 +31,4 @@ def test_toolbar_and_list_view(tmp_path):
     assert "Acme" in lst and "ML Engineer" in lst and "Found" in lst
     assert "No roles with this status." in render_list(t, status="Applied")
     t.close()
+
