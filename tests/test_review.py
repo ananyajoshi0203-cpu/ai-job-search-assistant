@@ -52,3 +52,14 @@ def test_serve_routes(tmp_path):
     home = urllib.request.urlopen(f"http://127.0.0.1:{port}/").read().decode()
     assert 'action="/run"' in home
     t.close()
+
+
+def test_mark_applied_button_and_status(tmp_path):
+    t = Tracker(tmp_path / "t.db")
+    jid = t.add(Job(company="Acme", role="ML Engineer", link="https://example.com/1"))
+    t.set_status(jid, "Ready to review")
+    assert 'value="applied"' in render(t) and "Mark as Applied" in render(t)
+    t.mark_applied(jid, "2026-10-27")
+    j = t.get(jid)
+    assert j.status == "Applied" and j.date_applied == "2026-10-27"
+    t.close()

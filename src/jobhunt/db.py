@@ -79,6 +79,12 @@ class Tracker:
         self.conn.execute("UPDATE jobs SET status = ? WHERE id = ?", (status, job_id))
         self.conn.commit()
 
+    def mark_applied(self, job_id: int, date_applied: str):
+        self.conn.execute(
+            "UPDATE jobs SET status = 'Applied', date_applied = ? WHERE id = ?",
+            (date_applied, job_id))
+        self.conn.commit()
+
     def set_resume(self, job_id: int, resume_version: str):
         self.conn.execute(
             "UPDATE jobs SET resume_version = ? WHERE id = ?", (resume_version, job_id))

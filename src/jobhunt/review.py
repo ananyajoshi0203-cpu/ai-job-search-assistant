@@ -137,6 +137,7 @@ def render(tracker: Tracker, msg: str = "") -> str:
             <input type="hidden" name="id" value="{j.id}">
             <button class="apply" name="decision" value="apply">Apply</button>
             <button class="no" name="decision" value="no">No</button>
+            <button class="tool" name="decision" value="applied">Mark as Applied</button>
           </form>
           <form method="post" action="/run" class="actions">
             <input type="hidden" name="id" value="{j.id}">
@@ -263,7 +264,11 @@ def serve(tracker: Tracker, port: int = 8765, config_path: str = "config.yaml"):
             job_id = int(form["id"][0])
             decision = form["decision"][0]
             msg = ""
-            if decision == "no":
+            if decision == "applied":
+                import datetime as _dt
+                tracker.mark_applied(job_id, _dt.date.today().isoformat())
+                msg = "Marked as Applied."
+            elif decision == "no":
                 tracker.set_status(job_id, "Skipped")
                 msg = "Marked Skipped — it will never be shown again."
             elif decision == "apply":
