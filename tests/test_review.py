@@ -63,3 +63,26 @@ def test_mark_applied_button_and_status(tmp_path):
     j = t.get(jid)
     assert j.status == "Applied" and j.date_applied == "2026-10-27"
     t.close()
+
+
+def test_resume_viewer_and_approve(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    out = tmp_path / "tailored"
+    out.mkdir()
+    (out / "acme_ml-engineer.md").write_text("# ALEX RIVERA\nPython, RAG, LangChain.")
+    (out / "acme_ml-engineer_draft_answers.md").write_text("Name: Alex Rivera")
+    t = Tracker(tmp_path / "t.db")
+    jid = t.add(Job(company="Acme", role="ML Engineer", link="https://example.com/1"))
+    t.set_status(jid, "Ready to review")
+    t.set_resume(jid, "acme_ml-engineer.md")
+    page = render(t)
+    assert f'href="/resume?id={jid}"' in page
+    assert 'href="/list?status=Applied"' in page
+    job = t.get(jid)
+    from jobhunt.review import resume_files, render_resume
+    rpath, apath = resume_files({"tailoring": {"output_dir": "tailored"}}, job)
+    view = render_resume(t, job, rpath.read_text(), apath.read_text())
+    assert "ALEX RIVERA" in view and "Approve this resume" in view
+    t.set_resume_approved(jid)
+    assert "Resume approved" in render(t)
+    t.close()

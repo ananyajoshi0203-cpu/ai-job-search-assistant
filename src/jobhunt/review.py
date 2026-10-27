@@ -108,7 +108,7 @@ def render_list(tracker: Tracker, status: str | None = None) -> str:
           <a href="{html.escape(j.link)}" target="_blank" rel="noopener">{html.escape(j.role)}</a>
           <span class="pill {pill_class.get(j.status, 'found')}">{html.escape(j.status)}</span>
           <p class="meta">{html.escape(j.location)} · Found {html.escape(j.date_found)} ·
-          Resume: {html.escape(j.resume_version or '—')}</p></div>""")
+          Resume: {'<a href="/resume?id=' + str(j.id) + '">' + html.escape(j.resume_version) + '</a>' if j.resume_version else '—'}</p></div>""")
     body = "\n".join(rows) or '<div class="empty">No roles with this status.</div>'
     inner = (f"<header><h1>All roles</h1><p>{len(jobs)} shown. "
              f"Filter:</p></header><div class='toolbar'>{filters}</div>{body}")
@@ -120,11 +120,11 @@ def render(tracker: Tracker, msg: str = "") -> str:
     counts = {s: sum(1 for j in all_jobs if j.status == s)
               for s in ("Ready to review", "Applied", "Skipped", "Found", "Closed")}
     ready = [j for j in all_jobs if j.status == "Ready to review"]
-    chips = (f'<span class="chip ready">Ready to review <b>{counts["Ready to review"]}</b></span>'
-             f'<span class="chip">Applied <b>{counts["Applied"]}</b></span>'
-             f'<span class="chip">Skipped <b>{counts["Skipped"]}</b></span>'
-             f'<span class="chip">Found <b>{counts["Found"]}</b></span>'
-             f'<span class="chip">Closed <b>{counts["Closed"]}</b></span>')
+    def chip(label, cls=""):
+        return (f'<a class="chip {cls}" style="text-decoration:none;color:inherit" '
+                f'href="/list?status={quote(label)}">{label} <b>{counts[label]}</b></a>')
+    chips = (chip("Ready to review", "ready") + chip("Applied") + chip("Skipped")
+             + chip("Found") + chip("Closed"))
     toast = f'<div class="toast">{html.escape(msg)}</div>' if msg else ""
     cards = []
     for j in ready:
@@ -132,7 +132,7 @@ def render(tracker: Tracker, msg: str = "") -> str:
         <div class="card">
           <h3>{html.escape(j.company)} — <a href="{html.escape(j.link)}" target="_blank" rel="noopener">{html.escape(j.role)}</a><span class="pill">Ready to review</span></h3>
           <p class="meta">{html.escape(j.location)} · Found {html.escape(j.date_found)} ·
-             Resume: <a href="file://{html.escape(j.resume_version)}">{html.escape(j.resume_version)}</a></p>
+             Resume: <a href="/resume?id={j.id}">{html.escape(j.resume_version)}</a>{' <span class="pill applied">Resume approved</span>' if j.resume_approved else ''}</p>
           <form method="post" action="/decide" class="actions">
             <input type="hidden" name="id" value="{j.id}">
             <button class="apply" name="decision" value="apply">Apply</button>
@@ -147,6 +147,46 @@ def render(tracker: Tracker, msg: str = "") -> str:
 <p>Apply pre-fills the form and stops before Submit. No marks a role Skipped — it never comes back.</p></header>
 <div class="counters">{chips}</div>{toast}{body}"""
     return _page("Job Search — Review", inner)
+
+
+def resume_files(config: dict, job) -> tuple[Path | None, Path | None]:
+    """Locate the tailored resume + draft answers files for a job."""
+    if not job.resume_version:
+        return None, None
+    out_dir = Path((config.get("tailoring", {}) or {}).get("output_dir", "tailored"))
+    resume = out_dir / job.resume_version
+    if not resume.exists() and (Path("tailored") / job.resume_version).exists():
+        resume = Path("tailored") / job.resume_version
+    answers = Path(str(resume).replace(".md", "_draft_answers.md"))
+    return (resume if resume.exists() else None,
+            answers if answers.exists() else None)
+
+
+def render_resume(tracker: Tracker, job, resume_text: str | None,
+                  answers_text: str | None, msg: str = "") -> str:
+    toast = f'<div class="toast">{html.escape(msg)}</div>' if msg else ""
+    approved = ('<span class="pill applied">Resume approved</span>'
+                if job.resume_approved else "")
+    approve_form = "" if job.resume_approved else f"""
+          <form method="post" action="/resume/approve" class="actions">
+            <input type="hidden" name="id" value="{job.id}">
+            <button class="apply">Approve this resume</button>
+          </form>"""
+    body = (f"<pre style='white-space:pre-wrap;font:14px/1.55 system-ui;background:#fff;"
+            f"border:1px solid #dfe3e8;border-radius:12px;padding:16px'>"
+            f"{html.escape(resume_text)}</pre>") if resume_text else (
+            '<div class="empty">Tailored resume file not found on disk.</div>')
+    answers = (f"<h3>Draft application answers</h3><pre style='white-space:pre-wrap;"
+               f"font:14px/1.55 system-ui;background:#fff;border:1px solid #dfe3e8;"
+               f"border-radius:12px;padding:16px'>{html.escape(answers_text)}</pre>"
+               if answers_text else "")
+    inner = f"""
+<header><h1>{html.escape(job.company)} — {html.escape(job.role)} {approved}</h1>
+<p>Tailored resume built for this application. Read it, then approve it — or go back and tailor again.</p></header>
+{toast}{body}{answers}
+<div class="actions">{approve_form}
+<a class="tool" href="/">Back to review</a></div>"""
+    return _page("Tailored resume", inner)
 
 
 def serve(tracker: Tracker, port: int = 8765, config_path: str = "config.yaml"):
@@ -169,7 +209,23 @@ def serve(tracker: Tracker, port: int = 8765, config_path: str = "config.yaml"):
         def do_GET(self):
             parsed = urlparse(self.path)
             qs = parse_qs(parsed.query)
-            if parsed.path == "/list":
+            if parsed.path == "/resume":
+                job = tracker.get(int(qs.get("id", ["0"])[0]))
+                if job is None:
+                    self._send_html(_page("Not found",
+                                          '<div class="empty">No such role.</div>'))
+                    return
+                try:
+                    config = load_config(config_path)
+                except Exception:
+                    config = {}
+                rpath, apath = resume_files(config, job)
+                self._send_html(render_resume(
+                    tracker, job,
+                    rpath.read_text() if rpath else None,
+                    apath.read_text() if apath else None,
+                    msg=qs.get("msg", [""])[0]))
+            elif parsed.path == "/list":
                 self._send_html(render_list(tracker, status=qs.get("status", [None])[0]))
             elif parsed.path == "/export":
                 fd, tmp = tempfile.mkstemp(suffix=".xlsx")
@@ -192,6 +248,15 @@ def serve(tracker: Tracker, port: int = 8765, config_path: str = "config.yaml"):
         def do_POST(self):
             length = int(self.headers.get("Content-Length", 0))
             form = parse_qs(self.rfile.read(length).decode())
+            if urlparse(self.path).path == "/resume/approve":
+                job_id = int(form.get("id", ["0"])[0])
+                tracker.set_resume_approved(job_id)
+                job = tracker.get(job_id)
+                self.send_response(303)
+                self.send_header("Location", f"/resume?id={job_id}&msg=" + quote(
+                    f"Resume approved for {job.company} — {job.role}."))
+                self.end_headers()
+                return
             if urlparse(self.path).path == "/run":
                 action = form.get("action", [""])[0]
                 try:
