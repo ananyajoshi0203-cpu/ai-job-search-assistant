@@ -307,6 +307,16 @@ def serve(tracker: Tracker, port: int = 8765, config_path: str = "config.yaml"):
                 job = tracker.get(job_id)
                 tracker.append_note(job_id, "Apply clicked from review page.")
                 try:
+                    import playwright  # noqa: F401 — pre-check so a missing extra reports instantly
+                except ImportError:
+                    tracker.append_note(
+                        job_id, "Apply clicked; pre-fill extra not installed yet.")
+                    self._redirect_msg(
+                        "Apply noted, but pre-fill isn't set up yet — click "
+                        "'Set up pre-fill (one-time)' in the toolbar, wait for it "
+                        "to finish, then click Apply again.")
+                    return
+                try:
                     config = load_config(config_path)
                     from .prefill import fill_application
                     prof = config.get("profile", {}) or {}
@@ -323,15 +333,19 @@ def serve(tracker: Tracker, port: int = 8765, config_path: str = "config.yaml"):
                         "output_dir", "tailored")
                     resume = (str(Path(out_dir) / job.resume_version)
                               if job.resume_version else None)
-                    fill_application(job.link, answers, resume_path=resume,
-                                     hold_seconds=120)
-                    msg = (f"Pre-filled {job.company} — {job.role} and stopped before "
-                           "Submit. If you submitted it in that window, click "
+                    import threading
+                    threading.Thread(
+                        target=fill_application,
+                        args=(job.link, answers),
+                        kwargs={"resume_path": resume, "hold_seconds": 300},
+                        daemon=True).start()
+                    msg = (f"Opening the {job.company} — {job.role} form in a new "
+                           "browser window, filled and stopped before Submit. "
+                           "Review it there and submit it yourself; then click "
                            "'Mark as Applied' on the card.")
                 except Exception as e:
                     msg = (f"Apply noted for {job.company} — {job.role}, but pre-fill "
-                           f"could not run: {e} If it says the browser extra is missing, "
-                           "click 'Set up pre-fill (one-time)' above, then Apply again.")
+                           f"could not start: {e}")
             self._redirect_msg(msg)
 
         def log_message(self, *a):
