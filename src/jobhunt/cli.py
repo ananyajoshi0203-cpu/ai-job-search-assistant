@@ -25,6 +25,9 @@ def main(argv=None):
     p_tailor.add_argument("--limit", type=int, default=10)
     sub.add_parser("review", help="Serve the local review page").add_argument(
         "--port", type=int, default=8765)
+    p_app = sub.add_parser(
+        "app", help="Easiest run: serve the page and open it in your browser")
+    p_app.add_argument("--port", type=int, default=8765)
     p_export = sub.add_parser("export", help="Export tracker to .xlsx")
     p_export.add_argument("--out", default="tracker.xlsx")
     p_skip = sub.add_parser("skip", help="Mark a job Skipped (never shown again)")
@@ -63,6 +66,18 @@ def main(argv=None):
     elif args.cmd == "review":
         from .review import serve
         serve(tracker, port=args.port, config_path=args.config)
+    elif args.cmd == "app":
+        import threading, webbrowser
+        from pathlib import Path as _P
+        config_path = args.config
+        if not _P(config_path).exists():
+            config_path = "sample/sample_config.yaml"
+            print(f"No {args.config} found — using the sample profile config. "
+                  "Copy config.example.yaml to config.yaml to use your own.")
+        print("Starting the app — your browser will open. Ctrl+C to stop.")
+        threading.Timer(1.2, lambda: webbrowser.open(f"http://localhost:{args.port}")).start()
+        from .review import serve
+        serve(tracker, port=args.port, config_path=config_path)
     elif args.cmd == "export":
         tracker.export_xlsx(args.out)
         print(f"Exported to {args.out}")
