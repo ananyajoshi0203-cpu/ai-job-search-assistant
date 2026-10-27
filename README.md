@@ -24,11 +24,11 @@ Statuses: `Found` → `Ready to review` → `Applied` · `Skipped` · `Closed`
 | Source | How | Default |
 |---|---|---|
 | Greenhouse, Lever, Ashby | Official public ATS APIs — add board tokens in config | On (ATS) |
-| LinkedIn | Public logged-out job search pages | **Off** |
-| Wellfound | Public search pages | **Off** |
-| Jobright | Public search pages | **Off** |
+| LinkedIn | Public logged-out job search pages | On |
+| Wellfound | Public search pages | On |
+| Jobright | Public search pages | On |
 
-> ⚠️ LinkedIn, Wellfound and Jobright restrict automated access in their Terms of Service. Those adapters ship **disabled**, use public pages only (no login, no CAPTCHA bypass), rate-limit strictly, and stop on blocks. Enabling one is your decision and your responsibility. The ATS APIs are the reliable, terms-clean path and are what we recommend.
+> ⚠️ LinkedIn, Wellfound and Jobright restrict automated access in their Terms of Service. Their adapters are **enabled by default** in this project and use public pages only (no login, no CAPTCHA bypass), rate-limit strictly, and stop on blocks. Using them is your decision and your responsibility — set `enabled: false` in config for any you don't want. The ATS APIs are the most reliable path.
 
 ## Quick start
 

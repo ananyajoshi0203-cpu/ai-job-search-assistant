@@ -23,20 +23,21 @@ sources:
   lever: []                          # jobs.lever.co/<token>
   ashby: []                          # jobs.ashbyhq.com/<token>
 
-  # Aggregators. These sites restrict automated access in their Terms of Service.
-  # They ship DISABLED. If you enable one, you are responsible for complying
-  # with that site's terms; the adapters use public pages only, no login,
-  # no CAPTCHA bypass, and strict rate limits.
+  # Aggregators — enabled by default in this project. Note: these sites
+  # restrict automated access in their Terms of Service. You are responsible
+  # for complying with each site's terms; the adapters use public pages only,
+  # no login, no CAPTCHA bypass, and strict rate limits. Set enabled: false
+  # for any source you don't want to use.
   linkedin:
-    enabled: false
+    enabled: true
     query: "machine learning engineer"
     location: "San Francisco Bay Area"
   wellfound:
-    enabled: false
+    enabled: true
     query: "machine-learning-engineer"
     location: "San Francisco Bay Area"
   jobright:
-    enabled: false
+    enabled: true
     query: "machine learning engineer new grad"
     location: "San Francisco Bay Area"
 

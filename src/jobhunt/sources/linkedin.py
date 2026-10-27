@@ -1,4 +1,4 @@
-"""LinkedIn adapter — DISABLED BY DEFAULT.
+"""LinkedIn adapter — enabled by default in this project.
 
 LinkedIn's User Agreement prohibits automated scraping. This adapter is
 provided for users who choose to enable it for personal, low-volume use of

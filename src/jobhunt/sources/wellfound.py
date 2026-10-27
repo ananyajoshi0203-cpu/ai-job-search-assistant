@@ -1,4 +1,4 @@
-"""Wellfound adapter — DISABLED BY DEFAULT.
+"""Wellfound adapter — enabled by default in this project.
 
 Wellfound (formerly AngelList Talent) restricts automated access in its
 terms. This adapter reads Wellfound's public job search pages only, at a

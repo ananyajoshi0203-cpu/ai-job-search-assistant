@@ -1,4 +1,4 @@
-"""Jobright adapter — DISABLED BY DEFAULT.
+"""Jobright adapter — enabled by default in this project.
 
 Jobright restricts automated access in its terms. This adapter reads
 Jobright's public search pages only, at a strict rate limit, and stops on

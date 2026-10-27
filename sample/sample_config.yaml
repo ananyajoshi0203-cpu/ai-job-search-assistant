@@ -14,9 +14,9 @@ sources:
   greenhouse: ["gleanwork"]
   lever: []
   ashby: []
-  linkedin: { enabled: false, query: "machine learning engineer", location: "San Francisco Bay Area" }
-  wellfound: { enabled: false, query: "machine-learning-engineer", location: "San Francisco Bay Area" }
-  jobright: { enabled: false, query: "machine learning engineer new grad", location: "San Francisco Bay Area" }
+  linkedin: { enabled: true, query: "machine learning engineer", location: "San Francisco Bay Area" }
+  wellfound: { enabled: true, query: "machine-learning-engineer", location: "San Francisco Bay Area" }
+  jobright: { enabled: true, query: "machine learning engineer new grad", location: "San Francisco Bay Area" }
 tailoring:
   enabled: false
   output_dir: "tailored"
