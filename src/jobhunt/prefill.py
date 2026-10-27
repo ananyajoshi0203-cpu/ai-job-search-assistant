@@ -27,6 +27,23 @@ def fill_application(apply_url: str, answers: dict[str, str],
         browser = p.chromium.launch(headless=False)
         page = browser.new_page()
         page.goto(apply_url)
+        page.wait_for_load_state("domcontentloaded")
+        # Many boards (Greenhouse included) put the form behind an
+        # 'Apply for this job' button or further down the same page.
+        # Opening the form is navigation, not submission.
+        if not page.locator("input[type=file]").count() and not page.get_by_label(
+                "First Name", exact=False).count():
+            for sel in ("a:has-text('Apply for this job')",
+                        "button:has-text('Apply for this job')",
+                        "a:has-text('Apply Now')", "a:has-text('Apply')"):
+                loc = page.locator(sel).first
+                if loc.count():
+                    try:
+                        loc.click(timeout=3000)
+                        page.wait_for_load_state("domcontentloaded")
+                    except Exception:
+                        pass
+                    break
         for label, value in answers.items():
             if not value:
                 continue  # blank means blank — fields not covered stay empty
