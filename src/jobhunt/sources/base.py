@@ -3,7 +3,7 @@ import time
 import requests
 from ..models import Job
 
-USER_AGENT = "ai-job-search-assistant/0.1 (+https://github.com/; personal job search; polite rate limits)"
+USER_AGENT = "ai-job-search-assistant/0.1 (+https://github.com/ananyajoshi0203-cpu/ai-job-search-assistant; personal job search; polite rate limits)"
 
 
 class SourceAdapter:

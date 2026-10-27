@@ -33,7 +33,7 @@ Statuses: `Found` → `Ready to review` → `Applied` · `Skipped` · `Closed`
 ## Quick start
 
 ```bash
-git clone https://github.com/joshi0203-cpu/ai-job-search-assistant.git
+git clone https://github.com/ananyajoshi0203-cpu/ai-job-search-assistant.git
 cd ai-job-search-assistant
 pip install -e .
 cp config.example.yaml config.yaml     # edit: your profile, roles, locations, ATS boards
