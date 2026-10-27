@@ -45,7 +45,7 @@ class Tracker:
     def __init__(self, path: str | Path):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.conn = sqlite3.connect(self.path)
+        self.conn = sqlite3.connect(self.path, check_same_thread=False)  # the local review server may serve from another thread
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(SCHEMA)
 

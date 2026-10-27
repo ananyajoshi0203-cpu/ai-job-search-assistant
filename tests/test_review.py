@@ -32,3 +32,23 @@ def test_toolbar_and_list_view(tmp_path):
     assert "No roles with this status." in render_list(t, status="Applied")
     t.close()
 
+
+
+def test_serve_routes(tmp_path):
+    import threading, time, urllib.request
+    from jobhunt.review import serve
+    t = Tracker(tmp_path / "t.db")
+    t.add(Job(company="Acme", role="ML Engineer", link="https://example.com/1",
+              date_found="2026-10-27"))
+    port = 8799
+    th = threading.Thread(target=serve, args=(t,), kwargs={"port": port}, daemon=True)
+    th.start()
+    time.sleep(0.5)
+    lst = urllib.request.urlopen(f"http://127.0.0.1:{port}/list").read().decode()
+    assert "Acme" in lst
+    with urllib.request.urlopen(f"http://127.0.0.1:{port}/export") as r:
+        assert "spreadsheetml" in r.headers["Content-Type"]
+        assert len(r.read()) > 100
+    home = urllib.request.urlopen(f"http://127.0.0.1:{port}/").read().decode()
+    assert 'action="/run"' in home
+    t.close()
