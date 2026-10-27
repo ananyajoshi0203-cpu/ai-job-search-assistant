@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 from .db import Tracker
-from .crawler import load_config, run_crawl
+from .crawler import load_config, run_crawl, tailor_found
 
 
 def main(argv=None):
@@ -20,6 +20,9 @@ def main(argv=None):
     p_crawl.add_argument("--max-new", type=int, default=10)
     sub.add_parser("list", help="List tracker rows").add_argument(
         "--status", default=None)
+    p_tailor = sub.add_parser(
+        "tailor", help="Tailor roles already at Status=Found and move them to Ready to review")
+    p_tailor.add_argument("--limit", type=int, default=10)
     sub.add_parser("review", help="Serve the local review page").add_argument(
         "--port", type=int, default=8765)
     p_export = sub.add_parser("export", help="Export tracker to .xlsx")
@@ -48,6 +51,12 @@ def main(argv=None):
                 print(f"- {j.company} — {j.role} — {j.link} — resume: {j.resume_version}")
         elif stats["found_new"] == 0 and stats["closed"] == 0:
             print("No new roles today.")
+    elif args.cmd == "tailor":
+        config = load_config(args.config)
+        stats = tailor_found(config, tracker, limit=args.limit)
+        print(json.dumps(stats, indent=2))
+        if stats["ready"]:
+            print(f"{stats['ready']} applications are ready for review.")
     elif args.cmd == "list":
         for j in tracker.list(status=args.status):
             print(f"[{j.id}] {j.status:16} {j.company} — {j.role} — {j.link}")

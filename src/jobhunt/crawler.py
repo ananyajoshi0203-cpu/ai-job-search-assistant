@@ -118,3 +118,46 @@ def run_crawl(config: dict, tracker: Tracker, today: str | None = None,
         tracker.add_run_note(today, "No new roles today")
     stats["ready_jobs"] = new_ready
     return stats
+
+
+def tailor_found(config: dict, tracker: Tracker, limit: int = 10) -> dict:
+    """Tailor roles already sitting at Status=Found (e.g. from a crawl run
+    with tailoring off, or before an API key was set). Explicitly invoking
+    this command IS the intent to tailor, so it runs regardless of the
+    tailoring.enabled flag. Closed postings become Closed, never tailored."""
+    from .tailor import LLMClient, tailor_resume
+    from .answers import draft_answers
+    profile = config.get("profile", {}) or {}
+    llm_cfg = config.get("llm", {}) or {}
+    llm = LLMClient(llm_cfg.get("base_url", "https://api.openai.com/v1"),
+                    llm_cfg.get("model", "gpt-4o-mini"),
+                    llm_cfg.get("api_key_env", "OPENAI_API_KEY"))
+    master = Path(profile["master_resume_path"]).read_text()
+    out_dir = Path((config.get("tailoring", {}) or {}).get("output_dir", "tailored"))
+    out_dir.mkdir(parents=True, exist_ok=True)
+    stats = {"ready": 0, "closed": 0, "errors": []}
+    for job in tracker.list(status="Found")[:limit]:
+        open_, reason = is_open(job.link)
+        if not open_:
+            tracker.set_status(job.id, "Closed")
+            tracker.append_note(job.id, f"Closed at tailor: {reason}")
+            stats["closed"] += 1
+            continue
+        try:
+            tailored, keywords = tailor_resume(
+                master, job.company, job.role, job.description or job.role, llm)
+            fname = f"{slug(job.company)}_{slug(job.role)}.md"
+            (out_dir / fname).write_text(tailored)
+            answers = draft_answers(tailored, job.company, job.role, llm)
+            (out_dir / f"{slug(job.company)}_{slug(job.role)}_draft_answers.md"
+             ).write_text(answers)
+            tracker.set_resume(job.id, fname)
+            tracker.append_note(
+                job.id, f"Shared keywords: {', '.join(keywords) or 'none verified'}. "
+                        f"Draft answers: {fname.replace('.md', '_draft_answers.md')}")
+            tracker.set_status(job.id, "Ready to review")
+            stats["ready"] += 1
+        except Exception as e:
+            tracker.append_note(job.id, f"Tailoring failed: {e}")
+            stats["errors"].append(f"tailor {job.company}/{job.role}: {e}")
+    return stats
