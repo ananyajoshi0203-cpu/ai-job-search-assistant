@@ -10,6 +10,8 @@ counters, and [Apply] / [No] buttons under each pair.
 """
 from __future__ import annotations
 import html
+import os
+import tempfile
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs, urlparse, quote
 from .db import Tracker
@@ -47,13 +49,68 @@ button.no { background: #fff; border-color: #c3cBD2; color: #444; }
 .notes { color: #5b6470; font-size: 13px; margin: 10px 0 0; white-space: pre-wrap; }
 .empty { background: #fff; border: 1px dashed #c3cbd2; border-radius: 12px;
          padding: 24px; text-align: center; color: #5b6470; }
+.toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.toolbar form { margin: 0; }
+button.tool, a.tool { font-size: 14px; border-radius: 8px; padding: 8px 14px;
+        cursor: pointer; border: 1px solid #c3cbd2; background: #fff; color: #1a1d21;
+        text-decoration: none; display: inline-block; }
+button.tool.primary { background: #0b5cad; border-color: #0b5cad; color: #fff; }
+.row { background: #fff; border: 1px solid #dfe3e8; border-radius: 10px;
+       padding: 10px 14px; margin: 8px 0; font-size: 14px; }
+.row a { color: #0b5cad; text-decoration: none; }
+.row .meta { margin: 2px 0 0; }
+.pill.found { background: #e8eef7; color: #0b5cad; border-color: #b9cfea; }
+.pill.ready { background: #fff4d6; color: #7a5b00; border-color: #e5cf8a; }
+.pill.applied { background: #e8f5ec; color: #205c39; border-color: #9fd3ae; }
+.pill.skipped { background: #f3e8e8; color: #8a3030; border-color: #dfb3b3; }
+.pill.closed { background: #eceff1; color: #546e7a; border-color: #c3cbd2; }
 @media (prefers-color-scheme: dark) {
   body { background: #14171a; color: #e8eaed; }
-  .card, .chip, .empty, button.no { background: #1d2126; border-color: #333a42; }
+  .card, .chip, .empty, button.no, .row, button.tool, a.tool { background: #1d2126; border-color: #333a42; color: #e8eaed; }
+  button.tool.primary { background: #0b5cad; color: #fff; }
   .meta, .notes, header p, .empty { color: #9aa4ae; }
   .card h3 a, .meta a { color: #6cb2f5; }
 }
 """
+
+
+TOOLBAR = """
+<div class="toolbar">
+  <form method="post" action="/run"><button class="tool primary" name="action" value="crawl">Run crawl</button></form>
+  <form method="post" action="/run"><button class="tool" name="action" value="tailor">Tailor Found roles</button></form>
+  <a class="tool" href="/list">All roles</a>
+  <a class="tool" href="/export">Export .xlsx</a>
+  <a class="tool" href="/">Review</a>
+</div>"""
+
+
+def _page(title: str, inner: str) -> str:
+    return f"""<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{title}</title><style>{CSS}</style></head>
+<body><div class="wrap">{TOOLBAR}{inner}</div></body></html>"""
+
+
+def render_list(tracker: Tracker, status: str | None = None) -> str:
+    jobs = tracker.list(status=status)
+    filters = "".join(
+        f'<a class="tool" href="/list?status={quote(s)}">{s}</a>' if s != status
+        else f'<span class="chip"><b>{s}</b></span>'
+        for s in ("Found", "Ready to review", "Applied", "Skipped", "Closed"))
+    rows = []
+    pill_class = {"Found": "found", "Ready to review": "ready", "Applied": "applied",
+                  "Skipped": "skipped", "Closed": "closed"}
+    for j in jobs:
+        rows.append(f"""
+        <div class="row"><b>{html.escape(j.company)}</b> —
+          <a href="{html.escape(j.link)}" target="_blank" rel="noopener">{html.escape(j.role)}</a>
+          <span class="pill {pill_class.get(j.status, 'found')}">{html.escape(j.status)}</span>
+          <p class="meta">{html.escape(j.location)} · Found {html.escape(j.date_found)} ·
+          Resume: {html.escape(j.resume_version or '—')}</p></div>""")
+    body = "\n".join(rows) or '<div class="empty">No roles with this status.</div>'
+    inner = (f"<header><h1>All roles</h1><p>{len(jobs)} shown. "
+             f"Filter:</p></header><div class='toolbar'>{filters}</div>{body}")
+    return _page("Job Search — All roles", inner)
 
 
 def render(tracker: Tracker, msg: str = "") -> str:
@@ -82,14 +139,11 @@ def render(tracker: Tracker, msg: str = "") -> str:
           <p class="notes">{html.escape(j.notes)}</p>
         </div>""")
     body = "\n".join(cards) or '<div class="empty">No applications ready for review.</div>'
-    return f"""<!doctype html><html><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Job Search — Review</title><style>{CSS}</style></head>
-<body><div class="wrap">
+    inner = f"""
 <header><h1>Applications ready for review</h1>
 <p>Apply pre-fills the form and stops before Submit. No marks a role Skipped — it never comes back.</p></header>
-<div class="counters">{chips}</div>{toast}{body}
-</div></body></html>"""
+<div class="counters">{chips}</div>{toast}{body}"""
+    return _page("Job Search — Review", inner)
 
 
 def serve(tracker: Tracker, port: int = 8765):

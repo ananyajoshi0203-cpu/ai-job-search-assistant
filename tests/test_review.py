@@ -19,3 +19,15 @@ def test_render_empty_state(tmp_path):
     t = Tracker(tmp_path / "t.db")
     assert "No applications ready for review." in render(t)
     t.close()
+
+
+def test_toolbar_and_list_view(tmp_path):
+    t = Tracker(tmp_path / "t.db")
+    t.add(Job(company="Acme", role="ML Engineer", link="https://example.com/1",
+              date_found="2026-10-27"))
+    page = render(t)
+    assert 'action="/run"' in page and 'href="/export"' in page and 'href="/list"' in page
+    lst = render_list(t)
+    assert "Acme" in lst and "ML Engineer" in lst and "Found" in lst
+    assert "No roles with this status." in render_list(t, status="Applied")
+    t.close()
