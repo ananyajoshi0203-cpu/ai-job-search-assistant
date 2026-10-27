@@ -79,6 +79,7 @@ TOOLBAR = """
 <div class="toolbar">
   <form method="post" action="/run"><button class="tool primary" name="action" value="crawl">Run crawl</button></form>
   <form method="post" action="/run"><button class="tool" name="action" value="tailor">Tailor Found roles</button></form>
+  <form method="post" action="/run"><button class="tool" name="action" value="setup_prefill">Set up pre-fill (one-time)</button></form>
   <a class="tool" href="/list">All roles</a>
   <a class="tool" href="/export">Export .xlsx</a>
   <a class="tool" href="/">Review</a>
@@ -207,6 +208,19 @@ def serve(tracker: Tracker, port: int = 8765, config_path: str = "config.yaml"):
                         msg = (f"Crawl done: {s['found_new']} new, {s['ready']} ready, "
                                f"{s['closed']} closed, {s['duplicates']} duplicates, "
                                f"{len(s['errors'])} errors.")
+                    elif action == "setup_prefill":
+                        import subprocess, sys
+                        steps = [[sys.executable, "-m", "pip", "install", "-q", "playwright"],
+                                 [sys.executable, "-m", "playwright", "install", "chromium"]]
+                        ok, detail = True, ""
+                        for cmd in steps:
+                            r = subprocess.run(cmd, capture_output=True, text=True)
+                            if r.returncode != 0:
+                                ok = False
+                                detail = (r.stderr or r.stdout)[-300:]
+                                break
+                        msg = ("Pre-fill is set up — click 'Pre-fill form...' on any card."
+                               if ok else f"Setup failed: {detail}")
                     elif action == "prefill":
                         job = tracker.get(int(form.get("id", ["0"])[0]))
                         if job is None:
