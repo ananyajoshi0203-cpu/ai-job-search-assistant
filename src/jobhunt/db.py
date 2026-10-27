@@ -29,7 +29,8 @@ CREATE TABLE IF NOT EXISTS jobs (
   next_follow_up TEXT DEFAULT '',
   interview_dates TEXT DEFAULT '',
   notes TEXT DEFAULT '',
-  description TEXT DEFAULT ''
+  description TEXT DEFAULT '',
+  resume_approved INTEGER DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS run_notes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -48,6 +49,12 @@ class Tracker:
         self.conn = sqlite3.connect(self.path, check_same_thread=False)  # the local review server may serve from another thread
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(SCHEMA)
+        # Migration for trackers created before resume_approved existed.
+        cols = {r["name"] for r in self.conn.execute("PRAGMA table_info(jobs)")}
+        if "resume_approved" not in cols:
+            self.conn.execute(
+                "ALTER TABLE jobs ADD COLUMN resume_approved INTEGER DEFAULT 0")
+            self.conn.commit()
 
     def close(self):
         self.conn.close()
@@ -85,6 +92,12 @@ class Tracker:
             (date_applied, job_id))
         self.conn.commit()
 
+    def set_resume_approved(self, job_id: int, approved: bool = True):
+        self.conn.execute(
+            "UPDATE jobs SET resume_approved = ? WHERE id = ?",
+            (1 if approved else 0, job_id))
+        self.conn.commit()
+
     def set_resume(self, job_id: int, resume_version: str):
         self.conn.execute(
             "UPDATE jobs SET resume_version = ? WHERE id = ?", (resume_version, job_id))
@@ -116,6 +129,10 @@ class Tracker:
         job.next_follow_up = r["next_follow_up"]
         job.interview_dates = r["interview_dates"]
         job.notes = r["notes"]
+        try:
+            job.resume_approved = bool(r["resume_approved"])
+        except (IndexError, KeyError):
+            job.resume_approved = False
         return job
 
     def list(self, status: str | None = None) -> list[Job]:

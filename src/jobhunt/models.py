@@ -41,6 +41,7 @@ class Job:
     next_follow_up: str = ""
     interview_dates: str = ""
     notes: str = ""
+    resume_approved: bool = False
 
     @property
     def dedupe_key(self) -> str:

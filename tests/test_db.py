@@ -32,3 +32,12 @@ def test_run_note(tmp_path):
     rows = t.conn.execute("SELECT note FROM run_notes").fetchall()
     assert rows[0]["note"] == "No new roles today"
     t.close()
+
+
+def test_resume_approved_flag(tmp_path):
+    t = Tracker(tmp_path / "t.db")
+    jid = t.add(make_job())
+    assert t.get(jid).resume_approved is False
+    t.set_resume_approved(jid)
+    assert t.get(jid).resume_approved is True
+    t.close()
