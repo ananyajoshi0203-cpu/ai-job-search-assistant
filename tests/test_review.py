@@ -1,6 +1,6 @@
 from jobhunt.db import Tracker
 from jobhunt.models import Job
-from jobhunt.review import render
+from jobhunt.review import render, render_list
 
 
 def test_render_shows_ready_card_and_counters(tmp_path):
