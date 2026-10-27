@@ -234,7 +234,7 @@ def serve(tracker: Tracker, port: int = 8765, config_path: str = "config.yaml"):
                                        "Nothing was submitted.")
                             except Exception as e:
                                 msg = (f"Pre-fill needs the browser extra: {e} "
-                                       "Install once with: python -m pip install -e ".[prefill]" "
+                                       'Install once with: python -m pip install -e ".[prefill]" '
                                        "&& playwright install chromium")
                     elif action == "tailor":
                         s = tailor_found(config, tracker)
