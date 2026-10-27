@@ -139,10 +139,6 @@ def render(tracker: Tracker, msg: str = "") -> str:
             <button class="no" name="decision" value="no">No</button>
             <button class="tool" name="decision" value="applied">Mark as Applied</button>
           </form>
-          <form method="post" action="/run" class="actions">
-            <input type="hidden" name="id" value="{j.id}">
-            <button class="tool" name="action" value="prefill">Pre-fill form…</button>
-          </form>
           <p class="notes">{html.escape(j.notes)}</p>
         </div>""")
     body = "\n".join(cards) or '<div class="empty">No applications ready for review.</div>'
@@ -222,35 +218,6 @@ def serve(tracker: Tracker, port: int = 8765, config_path: str = "config.yaml"):
                                 break
                         msg = ("Pre-fill is set up — click 'Pre-fill form...' on any card."
                                if ok else f"Setup failed: {detail}")
-                    elif action == "prefill":
-                        job = tracker.get(int(form.get("id", ["0"])[0]))
-                        if job is None:
-                            msg = "That role no longer exists."
-                        else:
-                            from .prefill import fill_application
-                            prof = config.get("profile", {}) or {}
-                            full = (prof.get("name") or "").split(" ", 1)
-                            answers = {
-                                "First Name": full[0] if full else "",
-                                "Last Name": full[1] if len(full) > 1 else "",
-                                "Email": prof.get("email_for_applications", ""),
-                                "Location": (prof.get("locations") or [""])[0],
-                                "LinkedIn": prof.get("linkedin", ""),
-                                "Website": prof.get("github", ""),
-                            }
-                            out_dir = (config.get("tailoring", {}) or {}).get(
-                                "output_dir", "tailored")
-                            resume = (str(Path(out_dir) / job.resume_version)
-                                      if job.resume_version else None)
-                            try:
-                                fill_application(job.link, answers,
-                                                 resume_path=resume, hold_seconds=120)
-                                msg = (f"Pre-fill finished for {job.company} — {job.role}. "
-                                       "Nothing was submitted.")
-                            except Exception as e:
-                                msg = (f"Pre-fill needs the browser extra: {e} "
-                                       'Install once with: python -m pip install -e ".[prefill]" '
-                                       "&& playwright install chromium")
                     elif action == "tailor":
                         s = tailor_found(config, tracker)
                         msg = (f"Tailor done: {s['ready']} ready, {s['closed']} closed, "
@@ -273,12 +240,33 @@ def serve(tracker: Tracker, port: int = 8765, config_path: str = "config.yaml"):
                 msg = "Marked Skipped — it will never be shown again."
             elif decision == "apply":
                 job = tracker.get(job_id)
-                tracker.append_note(
-                    job_id,
-                    "Pre-fill requested from review page. Run: jobhunt prefill "
-                    f"--job-id {job_id}  (fills the form, stops before Submit).")
-                msg = (f"Apply noted for {job.company} — {job.role}. "
-                       f"Run: jobhunt prefill --job-id {job_id} (stops before Submit).")
+                tracker.append_note(job_id, "Apply clicked from review page.")
+                try:
+                    config = load_config(config_path)
+                    from .prefill import fill_application
+                    prof = config.get("profile", {}) or {}
+                    full = (prof.get("name") or "").split(" ", 1)
+                    answers = {
+                        "First Name": full[0] if full else "",
+                        "Last Name": full[1] if len(full) > 1 else "",
+                        "Email": prof.get("email_for_applications", ""),
+                        "Location": (prof.get("locations") or [""])[0],
+                        "LinkedIn": prof.get("linkedin", ""),
+                        "Website": prof.get("github", ""),
+                    }
+                    out_dir = (config.get("tailoring", {}) or {}).get(
+                        "output_dir", "tailored")
+                    resume = (str(Path(out_dir) / job.resume_version)
+                              if job.resume_version else None)
+                    fill_application(job.link, answers, resume_path=resume,
+                                     hold_seconds=120)
+                    msg = (f"Pre-filled {job.company} — {job.role} and stopped before "
+                           "Submit. If you submitted it in that window, click "
+                           "'Mark as Applied' on the card.")
+                except Exception as e:
+                    msg = (f"Apply noted for {job.company} — {job.role}, but pre-fill "
+                           f"could not run: {e} If it says the browser extra is missing, "
+                           "click 'Set up pre-fill (one-time)' above, then Apply again.")
             self._redirect_msg(msg)
 
         def log_message(self, *a):
