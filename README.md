@@ -30,7 +30,27 @@ Statuses: `Found` → `Ready to review` → `Applied` · `Skipped` · `Closed`
 
 > ⚠️ LinkedIn, Wellfound and Jobright restrict automated access in their Terms of Service. Their adapters are **enabled by default** in this project and use public pages only (no login, no CAPTCHA bypass), rate-limit strictly, and stop on blocks. Using them is your decision and your responsibility — set `enabled: false` in config for any you don't want. The ATS APIs are the most reliable path.
 
-## Quick start
+## Easiest way to run it
+
+**macOS:** double-click **`run.command`** in the repo folder. **Any OS, one command:**
+
+```bash
+jobhunt app
+```
+
+Both set up the virtualenv if needed, start the app, and open it in your
+browser. The app's page is the whole tool: **Run crawl**, **Tailor Found
+roles**, **All roles**, **Export .xlsx**, per-card **Apply** / **No**, and a
+**Pre-fill form...** button that opens the application form already filled
+(stopping before Submit - the browser extra installs once with
+`python -m pip install -e ".[prefill]" && playwright install chromium`).
+
+**Your data persists.** Everything lives in the SQLite tracker file
+(`data/tracker.db` by default) and the `tailored/` folder on your disk.
+Killing the app loses nothing - restart and every role, status, note and
+resume is exactly where you left it.
+
+## Quick start (manual setup)
 
 You need Python 3.10+ (check with `python3 --version`; if it's missing, install it from [python.org/downloads](https://www.python.org/downloads/)).
 
