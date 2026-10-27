@@ -10,9 +10,24 @@ Requires the optional extra:  pip install -e ".[prefill]"  &&  playwright instal
 """
 from __future__ import annotations
 import re
+from pathlib import Path
 
 FORBIDDEN_BUTTON_TEXT = re.compile(
     r"submit|apply now$|send application|confirm application", re.I)
+
+
+def upload_resume_path(resume_path: str | None) -> str | None:
+    """The uploadable version of a tailored resume: .md becomes .docx
+    (forms reject Markdown); anything else passes through unchanged."""
+    if not resume_path:
+        return None
+    p = Path(resume_path)
+    if p.suffix.lower() == ".md" and p.exists():
+        from .resume_docx import markdown_to_docx
+        docx = p.with_suffix(".docx")
+        markdown_to_docx(p.read_text(), docx)
+        return str(docx)
+    return resume_path
 
 
 def fill_application(apply_url: str, answers: dict[str, str],
@@ -50,10 +65,30 @@ def fill_application(apply_url: str, answers: dict[str, str],
             loc = page.get_by_label(label, exact=False)
             if loc.count():
                 loc.first.fill(value)
-        if resume_path:
-            file_input = page.locator("input[type=file]").first
-            if file_input.count():
-                file_input.set_input_files(resume_path)
+        upload = upload_resume_path(resume_path)
+        if upload:
+            # Prefer the resume upload specifically (a form may also have a
+            # cover-letter input); fall back to the first file input.
+            target = None
+            inputs = page.locator("input[type=file]")
+            for i in range(inputs.count()):
+                el = inputs.nth(i)
+                hint = " ".join([
+                    el.get_attribute("id") or "",
+                    el.get_attribute("name") or "",
+                    el.get_attribute("aria-label") or "",
+                    el.get_attribute("accept") or ""]).lower()
+                if "resume" in hint or "cv" in hint or "doc" in hint or "pdf" in hint:
+                    target = el
+                    break
+            if target is None and inputs.count():
+                target = inputs.first
+            if target is not None:
+                target.set_input_files(upload)
+                print(f"Attached resume: {upload}")
+            else:
+                print("WARNING: no file upload field found on the form — "
+                      "resume was NOT attached.")
         # Guard: refuse, loudly, if anything tries to go further.
         for btn in page.locator("button, input[type=submit]").all():
             text = (btn.inner_text() if btn.evaluate("e => e.tagName") == "BUTTON"
