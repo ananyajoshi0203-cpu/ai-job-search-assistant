@@ -47,8 +47,31 @@ export OPENAI_API_KEY=...               # your own key, any OpenAI-compatible en
 
 jobhunt init                            # create the SQLite tracker (data/tracker.db)
 jobhunt crawl                           # one full run
+jobhunt tailor                          # only if you crawled before setting a key (see below)
 jobhunt review                          # local review page at http://localhost:8765
 jobhunt export --out tracker.xlsx       # spreadsheet export
+```
+
+**One config, one database — for every command.** All commands share two
+global flags, which go BEFORE the subcommand: `--config` (default
+`config.yaml`) and `--db` (default `data/tracker.db`). If you crawl with
+non-default flags, every later command needs the *same* flags, or it will
+look at a different (or nonexistent) tracker. Skipping `--config` when you
+never created `config.yaml` gives `FileNotFoundError: 'config.yaml'`.
+
+**Crawled first, key later?** If a crawl ran with tailoring off or before
+you set `OPENAI_API_KEY`, your roles sit at `Found`. Don't re-crawl (known
+roles are skipped as duplicates) — run `jobhunt tailor` with the same
+flags instead. It re-checks each Found role is still open, tailors it, and
+moves it to `Ready to review`.
+
+**Try the sample profile first** (fictional data, same flag pair throughout):
+
+```bash
+jobhunt --config sample/sample_config.yaml --db data/demo.db crawl
+export OPENAI_API_KEY=...               # needed for the tailor step
+jobhunt --config sample/sample_config.yaml --db data/demo.db tailor
+jobhunt --db data/demo.db review
 ```
 
 Notes that save everyone time:
@@ -57,6 +80,7 @@ Notes that save everyone time:
 - **Every new terminal window** needs `source .venv/bin/activate` again (your prompt shows `(.venv)` when it's active). Skip it and you'll get `command not found: jobhunt`.
 - Never call bare `pip` — on macOS it often doesn't exist. Always `python -m pip` inside the venv (or `python3 -m pip` outside it). The venv also avoids macOS's `externally-managed-environment` error.
 - No entry point? Run the module directly from the repo folder: `PYTHONPATH=src python3 -m jobhunt.cli crawl`.
+- `invalid choice: 'tailor'` (or any subcommand)? Your clone is behind — run `git pull`. The usage line in the error always lists what your copy actually has.
 
 Try it safely with the fictional sample profile first (no API key needed if tailoring is off):
 
