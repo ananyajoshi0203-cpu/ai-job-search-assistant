@@ -12,7 +12,8 @@ from __future__ import annotations
 import html
 import os
 import tempfile
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse, quote
 from .db import Tracker
 
@@ -136,6 +137,10 @@ def render(tracker: Tracker, msg: str = "") -> str:
             <button class="apply" name="decision" value="apply">Apply</button>
             <button class="no" name="decision" value="no">No</button>
           </form>
+          <form method="post" action="/run" class="actions">
+            <input type="hidden" name="id" value="{j.id}">
+            <button class="tool" name="action" value="prefill">Pre-fill form…</button>
+          </form>
           <p class="notes">{html.escape(j.notes)}</p>
         </div>""")
     body = "\n".join(cards) or '<div class="empty">No applications ready for review.</div>'
@@ -202,6 +207,35 @@ def serve(tracker: Tracker, port: int = 8765, config_path: str = "config.yaml"):
                         msg = (f"Crawl done: {s['found_new']} new, {s['ready']} ready, "
                                f"{s['closed']} closed, {s['duplicates']} duplicates, "
                                f"{len(s['errors'])} errors.")
+                    elif action == "prefill":
+                        job = tracker.get(int(form.get("id", ["0"])[0]))
+                        if job is None:
+                            msg = "That role no longer exists."
+                        else:
+                            from .prefill import fill_application
+                            prof = config.get("profile", {}) or {}
+                            full = (prof.get("name") or "").split(" ", 1)
+                            answers = {
+                                "First Name": full[0] if full else "",
+                                "Last Name": full[1] if len(full) > 1 else "",
+                                "Email": prof.get("email_for_applications", ""),
+                                "Location": (prof.get("locations") or [""])[0],
+                                "LinkedIn": prof.get("linkedin", ""),
+                                "Website": prof.get("github", ""),
+                            }
+                            out_dir = (config.get("tailoring", {}) or {}).get(
+                                "output_dir", "tailored")
+                            resume = (str(Path(out_dir) / job.resume_version)
+                                      if job.resume_version else None)
+                            try:
+                                fill_application(job.link, answers,
+                                                 resume_path=resume, hold_seconds=120)
+                                msg = (f"Pre-fill finished for {job.company} — {job.role}. "
+                                       "Nothing was submitted.")
+                            except Exception as e:
+                                msg = (f"Pre-fill needs the browser extra: {e} "
+                                       "Install once with: python -m pip install -e ".[prefill]" "
+                                       "&& playwright install chromium")
                     elif action == "tailor":
                         s = tailor_found(config, tracker)
                         msg = (f"Tailor done: {s['ready']} ready, {s['closed']} closed, "
@@ -232,4 +266,4 @@ def serve(tracker: Tracker, port: int = 8765, config_path: str = "config.yaml"):
             pass
 
     print(f"Review page: http://localhost:{port}  (Ctrl+C to stop)")
-    HTTPServer(("127.0.0.1", port), H).serve_forever()
+    ThreadingHTTPServer(("127.0.0.1", port), H).serve_forever()

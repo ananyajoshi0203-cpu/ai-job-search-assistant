@@ -16,7 +16,8 @@ FORBIDDEN_BUTTON_TEXT = re.compile(
 
 
 def fill_application(apply_url: str, answers: dict[str, str],
-                     resume_path: str | None = None):  # pragma: no cover
+                     resume_path: str | None = None,
+                     hold_seconds: int = 0):  # pragma: no cover
     try:
         from playwright.sync_api import sync_playwright
     except ImportError as e:
@@ -43,5 +44,12 @@ def fill_application(apply_url: str, answers: dict[str, str],
             if FORBIDDEN_BUTTON_TEXT.search(text or ""):
                 print(f"STOP: filled form is displayed. Final button '{text}' "
                       "was NOT clicked. Review it and submit it yourself.")
-        input("Form filled. Press Enter to close the browser (nothing was submitted). ")
+        if hold_seconds:
+            import time
+            print(f"Review the filled form in the browser window — it stays open "
+                  f"{hold_seconds} seconds. Nothing was submitted; submit it yourself "
+                  "in that window if it looks right.")
+            time.sleep(hold_seconds)
+        else:
+            input("Form filled. Press Enter to close the browser (nothing was submitted). ")
         browser.close()
