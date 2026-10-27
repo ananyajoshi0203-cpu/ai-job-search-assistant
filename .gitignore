@@ -1,0 +1,16 @@
+# Personal data — never commit these
+*.db
+*.sqlite
+*.sqlite3
+tracker.xlsx
+data/
+resumes/private/
+tailored/
+.env
+config.yaml
+__pycache__/
+*.pyc
+.venv/
+dist/
+build/
+*.egg-info/

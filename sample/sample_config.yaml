@@ -1,0 +1,22 @@
+# Demo config using the fictional Alex Rivera sample profile.
+profile:
+  name: "Alex Rivera (sample)"
+  roles: ["AI Engineer", "Machine Learning Engineer"]
+  locations: ["San Francisco Bay Area"]
+  keywords: ["machine learning", "ai engineer", "ml engineer", "llm"]
+  email_for_applications: "alex.rivera.sample@gmail.com"
+  master_resume_path: "sample/sample_resume.md"
+llm:
+  base_url: "https://api.openai.com/v1"
+  model: "gpt-4o-mini"
+  api_key_env: "OPENAI_API_KEY"
+sources:
+  greenhouse: ["gleanwork"]
+  lever: []
+  ashby: []
+  linkedin: { enabled: false, query: "machine learning engineer", location: "San Francisco Bay Area" }
+  wellfound: { enabled: false, query: "machine-learning-engineer", location: "San Francisco Bay Area" }
+  jobright: { enabled: false, query: "machine learning engineer new grad", location: "San Francisco Bay Area" }
+tailoring:
+  enabled: false
+  output_dir: "tailored"

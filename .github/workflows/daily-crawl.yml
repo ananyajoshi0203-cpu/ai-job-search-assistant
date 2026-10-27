@@ -1,0 +1,26 @@
+name: Daily job crawl
+# Runs the assistant on GitHub's machines, on YOUR schedule, with YOUR key.
+# The tracker DB is kept as a workflow artifact; for a persistent tracker,
+# commit data/tracker.db in a PRIVATE repo or point --db at your own storage.
+on:
+  schedule:
+    - cron: "0 15 * * *"   # 08:00 America/Los_Angeles during PDT — adjust for your timezone
+  workflow_dispatch: {}
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -e .
+      - name: Run crawl
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: jobhunt --config config.yaml crawl
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tracker-and-tailored
+          path: |
+            data/tracker.db
+            tailored/

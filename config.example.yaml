@@ -1,0 +1,45 @@
+# Copy to config.yaml and make it yours. config.yaml is git-ignored.
+
+profile:
+  name: "Your Name"
+  roles: ["AI Engineer", "Machine Learning Engineer"]
+  locations: ["San Francisco Bay Area", "San Jose", "San Francisco", "Palo Alto", "Mountain View"]
+  keywords: ["machine learning", "ai engineer", "ml engineer", "llm", "rag"]
+  email_for_applications: "you@example.com"
+  master_resume_path: "resumes/master_resume.md"   # never overwritten by the tool
+
+schedule:
+  daily_at: "08:00"        # used by the GitHub Actions template / your own cron
+
+llm:
+  # Bring your own key. Any OpenAI-compatible endpoint works.
+  base_url: "https://api.openai.com/v1"
+  model: "gpt-4o-mini"
+  api_key_env: "OPENAI_API_KEY"
+
+sources:
+  # Official ATS APIs — reliable, ToS-clean. Add the board tokens you care about.
+  greenhouse: ["gleanwork"]          # boards.greenhouse.io/<token>
+  lever: []                          # jobs.lever.co/<token>
+  ashby: []                          # jobs.ashbyhq.com/<token>
+
+  # Aggregators. These sites restrict automated access in their Terms of Service.
+  # They ship DISABLED. If you enable one, you are responsible for complying
+  # with that site's terms; the adapters use public pages only, no login,
+  # no CAPTCHA bypass, and strict rate limits.
+  linkedin:
+    enabled: false
+    query: "machine learning engineer"
+    location: "San Francisco Bay Area"
+  wellfound:
+    enabled: false
+    query: "machine-learning-engineer"
+    location: "San Francisco Bay Area"
+  jobright:
+    enabled: false
+    query: "machine learning engineer new grad"
+    location: "San Francisco Bay Area"
+
+tailoring:
+  enabled: true            # set false to stop at Status=Found
+  output_dir: "tailored"   # one file per role, named <company>_<role>.md
